@@ -24,10 +24,16 @@
 #include "game.h"
 #include "gui.h"
 #include "level.h"
+#include "palette.h"
 
 // pixel offset of game board from top-left corner of window
 #define BOARD_X 17
 #define BOARD_Y 17
+
+#define WINDOW_W 734
+#define WINDOW_H 547
+
+#define NUM_PALETTE_SPRITES 26
 
 // prints error message if fails
 SDL_Surface *util_LoadBMP(const char *path);
@@ -47,11 +53,31 @@ bool anim_on;
 int anim_delay;
 int anim_phase;
 
+struct panel *game_panel;
+struct panel *control_panel;
+struct palette *editor_palette;
+
+bool editor_on;
+
 void render(void)
 {
 	SDL_UpdateTexture(texture, NULL, screen->pixels, screen->pitch);
 	SDL_RenderCopy(renderer, texture, NULL, NULL);
 	SDL_RenderPresent(renderer);
+}
+
+void open_editor(void)
+{
+	game_panel->n_child--;
+	add_child(CONTAINER(game_panel), WIDGET(editor_palette), 4, 14);
+	editor_on = true;
+}
+
+void close_editor(void)
+{
+	game_panel->n_child--;
+	add_child(CONTAINER(game_panel), WIDGET(control_panel), 10, 5);
+	editor_on = false;
 }
 
 void start_level(void)
@@ -102,6 +128,9 @@ void start_level(void)
 	tank_alive = true;
 	num_lasers = 0;
 	active = true;
+	if (editor_on) {
+		close_editor();
+	}
 }
 
 int get_sprite_id(uint8_t obj, int anim_phase)
@@ -365,12 +394,23 @@ l:
 			case SDLK_r:
 				start_level();
 				break;
+			case SDLK_F9:
+				if (editor_on) {
+					close_editor();
+				} else {
+					open_editor();
+				}
+				draw_gui();
+				render();
+				break;
 			}
 			break;
 		case SDL_MOUSEBUTTONDOWN:
 			switch (e.button.button) {
-				int b;
+				//int b;
 			case SDL_BUTTON_LEFT:
+				handle_button_down(&e.button);
+#if 0
 				b = get_button_at(e.button.x, e.button.y);
 				switch (b) {
 				case BUTTON_PREV_LEVEL:
@@ -386,6 +426,7 @@ l:
 					}
 					break;
 				}
+#endif
 				break;
 			case SDL_BUTTON_RIGHT:
 				break;
@@ -410,11 +451,86 @@ l:
 	}
 }
 
+#define NUM_BUTTONS 9
+
+void null_proc() {}
+
+void hello()
+{
+	printf("hello\n");
+}
+
+void populate_gui(void)
+{
+	static SDL_Rect button_rect[NUM_BUTTONS] = {
+		{ 5, 5, 70, 20 },
+		{ 80, 5, 70, 20 },
+		{ 5, 30, 145, 20 },
+		{ 5, 55, 145, 20 },
+		{ 5, 80, 70, 20 },
+		{ 80, 80, 70, 20 },
+		{ 5, 105, 145, 20 },
+		{ 5, 130, 70, 20 },
+		{ 80, 130, 70, 20 },
+	};
+
+	static void *button_cb[NUM_BUTTONS] = {
+		null_proc,
+		null_proc,
+		null_proc,
+		null_proc,
+		null_proc,
+		null_proc,
+		null_proc,
+		hello,
+		hello,
+	};
+
+	static int palette_sprite_id[NUM_PALETTE_SPRITES] = {
+		0,1,5,8,12,
+		13,14,15,35,38,
+		41,19,20,21,22,
+		23,26,29,32,44,
+		46,47,48,49,55,
+		56,
+	};
+	static SDL_Surface *palette_sprites[NUM_PALETTE_SPRITES];
+
+	struct button *b;
+
+	// control panel absolute coordinates (bevel included): 560 250 715 405
+
+	game_panel = malloc(sizeof *game_panel);
+	panel_init(game_panel, 1, BEVEL_NONE);
+	game_panel->w = 181;
+	game_panel->h = 299;
+	add_child(&root, WIDGET(game_panel), 550, 245);
+	control_panel = malloc(sizeof *control_panel);
+	panel_init(control_panel, NUM_BUTTONS, BEVEL_INNER);
+	control_panel->w = 155;
+	control_panel->h = 155;
+	add_child(CONTAINER(game_panel), WIDGET(control_panel), 10, 5);
+	for (int i=0; i<NUM_BUTTONS; i++) {
+		b = malloc(sizeof *b);
+		button_init(b, (button_down_handler) button_cb[i]);
+		b->w = button_rect[i].w;
+		b->h = button_rect[i].h;
+		add_child(CONTAINER(control_panel), WIDGET(b), button_rect[i].x, button_rect[i].y);
+	}
+
+	for (int i=0; i<NUM_PALETTE_SPRITES; i++) {
+		palette_sprites[i] = sprites[palette_sprite_id[i]];
+	}
+
+	editor_palette = malloc(sizeof *editor_palette);
+	palette_init(editor_palette, 5, NUM_PALETTE_SPRITES, palette_sprites);
+}
+
 int main(int argc, char **argv)
 {
 	// same as data/bg.bmp
-	int w = 734;
-	int h = 547;
+	int w = WINDOW_W;
+	int h = WINDOW_H;
 	SDL_Surface *bg;
 
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -472,10 +588,15 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	init_gui(1);
+	populate_gui();
+
 	SDL_AddTimer(50, timer_callback, NULL);
 
 	// draw background
 	SDL_BlitSurface(bg, NULL, screen, NULL);
+
+	draw_gui();
 
 	anim_on = true;
 	current_level = 0;

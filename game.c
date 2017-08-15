@@ -348,6 +348,7 @@ void tick(void)
 			if (check_antitank(d, &anti)) {
 				if (num_lasers < MAX_LASERS) {
 					struct laser *l = add_laser(anti.y, anti.x, 1, (d+2)&3);
+					// in case laser hits player immediately
 					update_laser(l);
 				}
 			}
@@ -372,8 +373,7 @@ void tick(void)
 
 void try_set_tank_action(int a)
 {
-	if (tank_alive && num_lasers == 0 &&
-	    tank_action == 0 &&
+	if (tank_alive && num_lasers == 0 && tank_action == 0 &&
 	    tank_mover_direction() < 0)
 	{
 		tank_action = a;
