@@ -43,6 +43,7 @@ int num_levels;
 struct level *levels;
 int current_level;
 
+bool anim_on;
 int anim_delay;
 int anim_phase;
 
@@ -352,6 +353,15 @@ void event_loop(void)
 l:
 				try_set_tank_action(a);
 				break;
+			case SDLK_a:
+				if (anim_on) {
+					anim_on = false;
+					anim_delay = 0;
+					anim_phase = 0;
+				} else {
+					anim_on = true;
+				}
+				break;
 			case SDLK_r:
 				start_level();
 				break;
@@ -386,9 +396,11 @@ l:
 		case SDL_USEREVENT:
 			if (active) {
 				tick();
-				anim_delay = (anim_delay-1)&3;
-				if (anim_delay == 0) {
-					anim_phase = (anim_phase+1)%3;
+				if (anim_on) {
+					anim_delay = (anim_delay-1)&3;
+					if (anim_delay == 0) {
+						anim_phase = (anim_phase+1)%3;
+					}
 				}
 				draw_board();
 				render();
@@ -465,6 +477,7 @@ int main(int argc, char **argv)
 	// draw background
 	SDL_BlitSurface(bg, NULL, screen, NULL);
 
+	anim_on = true;
 	current_level = 0;
 	start_level();
 	draw_board();
