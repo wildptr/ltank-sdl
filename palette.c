@@ -58,4 +58,6 @@ void palette_init(struct palette *w, int n_col, int n_sprite, SDL_Surface **spri
 	w->n_row = n_row;
 	w->n_sprite = n_sprite;
 	w->sprites = sprites;
+	w->selection1 = 0;
+	w->selection2 = 0;
 }

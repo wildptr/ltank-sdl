@@ -35,6 +35,8 @@
 
 #define NUM_PALETTE_SPRITES 26
 
+#define MS_PER_TICK 50
+
 // prints error message if fails
 SDL_Surface *util_LoadBMP(const char *path);
 
@@ -53,11 +55,13 @@ bool anim_on;
 int anim_delay;
 int anim_phase;
 
-struct panel *game_panel;
-struct panel *control_panel;
-struct palette *editor_palette;
+struct panel game_panel;
+struct panel control_panel;
+struct palette editor_palette;
 
 bool editor_on;
+
+SDL_TimerID game_timer;
 
 void render(void)
 {
@@ -68,16 +72,59 @@ void render(void)
 
 void open_editor(void)
 {
-	game_panel->n_child--;
-	add_child(CONTAINER(game_panel), WIDGET(editor_palette), 4, 14);
+	SDL_RemoveTimer(game_timer);
+	game_panel.n_child--;
+	add_child(CONTAINER(&game_panel), WIDGET(&editor_palette), 4, 14);
 	editor_on = true;
 }
 
+uint32_t timer_callback(Uint32 interval, void *param);
+
 void close_editor(void)
 {
-	game_panel->n_child--;
-	add_child(CONTAINER(game_panel), WIDGET(control_panel), 10, 5);
+	game_panel.n_child--;
+	add_child(CONTAINER(&game_panel), WIDGET(&control_panel), 10, 5);
+	game_timer = SDL_AddTimer(MS_PER_TICK, timer_callback, NULL);
 	editor_on = false;
+}
+
+void place_object(int obj, int y, int x)
+{
+	uint8_t fg = 0, bg = 0;
+	switch (obj) {
+	case 0: break;
+	case 1:
+		tank_y = y;
+		tank_x = x;
+		break;
+	case 2: bg = B_FLAG; break;
+	case 3: bg = B_WATER; break;
+	case 4: fg = F_WALL; break;
+	case 5: fg = F_CRATE; break;
+	case 6: fg = F_BRICK; break;
+	case 7: fg = F_ANTI_N; break;
+	case 8: fg = F_ANTI_E; break;
+	case 9: fg = F_ANTI_S; break;
+	case 10: fg = F_ANTI_W; break;
+	case 11: fg = F_MIRROR_NW; break;
+	case 12: fg = F_MIRROR_NE; break;
+	case 13: fg = F_MIRROR_SE; break;
+	case 14: fg = F_MIRROR_SW; break;
+	case 15: bg = B_BELT_N; break;
+	case 16: bg = B_BELT_E; break;
+	case 17: bg = B_BELT_S; break;
+	case 18: bg = B_BELT_W; break;
+	case 19: fg = F_CRYSTAL; break;
+	case 20: fg = F_ROT_MIRROR_NW; break;
+	case 21: fg = F_ROT_MIRROR_NE; break;
+	case 22: fg = F_ROT_MIRROR_SE; break;
+	case 23: fg = F_ROT_MIRROR_SW; break;
+	case 24: bg = B_ICE; break;
+	case 25: bg = B_THIN_ICE; break;
+	default: fg = F_WALL;
+	}
+	board[y][x].fg = fg;
+	board[y][x].bg = bg;
 }
 
 void start_level(void)
@@ -86,41 +133,7 @@ void start_level(void)
 	for (int y=0; y<16; y++) {
 		for (int x=0; x<16; x++) {
 			uint8_t b = l->board[x][y];
-			uint8_t fg = 0, bg = 0;
-			switch (b) {
-			case 0: break;
-			case 1:
-				tank_y = y;
-				tank_x = x;
-				break;
-			case 2: bg = B_FLAG; break;
-			case 3: bg = B_WATER; break;
-			case 4: fg = F_WALL; break;
-			case 5: fg = F_CRATE; break;
-			case 6: fg = F_BRICK; break;
-			case 7: fg = F_ANTI_N; break;
-			case 8: fg = F_ANTI_E; break;
-			case 9: fg = F_ANTI_S; break;
-			case 10: fg = F_ANTI_W; break;
-			case 11: fg = F_MIRROR_NW; break;
-			case 12: fg = F_MIRROR_NE; break;
-			case 13: fg = F_MIRROR_SE; break;
-			case 14: fg = F_MIRROR_SW; break;
-			case 15: bg = B_BELT_N; break;
-			case 16: bg = B_BELT_E; break;
-			case 17: bg = B_BELT_S; break;
-			case 18: bg = B_BELT_W; break;
-			case 19: fg = F_CRYSTAL; break;
-			case 20: fg = F_ROT_MIRROR_NW; break;
-			case 21: fg = F_ROT_MIRROR_NE; break;
-			case 22: fg = F_ROT_MIRROR_SE; break;
-			case 23: fg = F_ROT_MIRROR_SW; break;
-			case 24: bg = B_ICE; break;
-			case 25: bg = B_THIN_ICE; break;
-			default: fg = F_WALL;
-			}
-			board[y][x].fg = fg;
-			board[y][x].bg = bg;
+			place_object(b, y, x);
 		}
 	}
 	tank_orient = NORTH;
@@ -355,6 +368,19 @@ void draw_board(void)
 	}
 }
 
+void editor_place_object(int obj, int y, int x)
+{
+	int old_tank_y = tank_y;
+	int old_tank_x = tank_x;
+	place_object(obj, y, x);
+	draw_tile(y, x, 0);
+	if (obj == 1 /* tank */) {
+		tank_alive = true;
+		draw_tile(old_tank_y, old_tank_x, 0);
+		draw_tank();
+	}
+}
+
 void event_loop(void)
 {
 	SDL_Event e;
@@ -380,7 +406,7 @@ void event_loop(void)
 			case SDLK_SPACE:
 				a = FIRE;
 l:
-				try_set_tank_action(a);
+				if (!editor_on) try_set_tank_action(a);
 				break;
 			case SDLK_a:
 				if (anim_on) {
@@ -392,7 +418,7 @@ l:
 				}
 				break;
 			case SDLK_r:
-				start_level();
+				if (!editor_on) start_level();
 				break;
 			case SDLK_F9:
 				if (editor_on) {
@@ -407,29 +433,48 @@ l:
 			break;
 		case SDL_MOUSEBUTTONDOWN:
 			switch (e.button.button) {
+				int dx, dy;
 				//int b;
 			case SDL_BUTTON_LEFT:
-				handle_button_down(&e.button);
-#if 0
-				b = get_button_at(e.button.x, e.button.y);
-				switch (b) {
-				case BUTTON_PREV_LEVEL:
-					if (current_level > 0) {
-						current_level--;
-						start_level();
-					}
-					break;
-				case BUTTON_NEXT_LEVEL:
-					if (current_level < num_levels) {
-						current_level++;
-						start_level();
-					}
-					break;
-				}
-#endif
-				break;
 			case SDL_BUTTON_RIGHT:
+				dx = e.button.x - BOARD_X;
+				dy = e.button.y - BOARD_Y;
+				if ((dx|dy)>>9 == 0) {
+					if (editor_on) {
+						int cy = dy >> 5;
+						int cx = dx >> 5;
+						int obj;
+						if (e.button.button == SDL_BUTTON_LEFT) {
+							obj = editor_palette.selection1;
+						} else {
+							obj = editor_palette.selection2;
+						}
+						editor_place_object(obj, cy, cx);
+						render();
+					} else {
+					}
+				} else {
+					handle_button_down(&e.button);
+				}
 				break;
+			}
+			break;
+		case SDL_MOUSEMOTION:
+			if (e.motion.state & (SDL_BUTTON_LMASK|SDL_BUTTON_RMASK)) {
+				int dx = e.motion.x - BOARD_X;
+				int dy = e.motion.y - BOARD_Y;
+				if ((dx|dy)>>9 == 0) {
+					int cy = dy >> 5;
+					int cx = dx >> 5;
+					int obj;
+					if (e.motion.state & SDL_BUTTON_LMASK) {
+						obj = editor_palette.selection1;
+					} else {
+						obj = editor_palette.selection2;
+					}
+					editor_place_object(obj, cy, cx);
+					render();
+				}
 			}
 			break;
 		case SDL_QUIT:
@@ -455,9 +500,20 @@ l:
 
 void null_proc() {}
 
-void hello()
+void cb_prev_level_button()
 {
-	printf("hello\n");
+	if (current_level > 0) {
+		current_level--;
+		start_level();
+	}
+}
+
+void cb_next_level_button()
+{
+	if (current_level < num_levels) {
+		current_level++;
+		start_level();
+	}
 }
 
 void populate_gui(void)
@@ -482,8 +538,8 @@ void populate_gui(void)
 		null_proc,
 		null_proc,
 		null_proc,
-		hello,
-		hello,
+		cb_prev_level_button,
+		cb_next_level_button,
 	};
 
 	static int palette_sprite_id[NUM_PALETTE_SPRITES] = {
@@ -496,34 +552,31 @@ void populate_gui(void)
 	};
 	static SDL_Surface *palette_sprites[NUM_PALETTE_SPRITES];
 
-	struct button *b;
+	static struct button button[NUM_BUTTONS];
 
 	// control panel absolute coordinates (bevel included): 560 250 715 405
 
-	game_panel = malloc(sizeof *game_panel);
-	panel_init(game_panel, 1, BEVEL_NONE);
-	game_panel->w = 181;
-	game_panel->h = 299;
-	add_child(&root, WIDGET(game_panel), 550, 245);
-	control_panel = malloc(sizeof *control_panel);
-	panel_init(control_panel, NUM_BUTTONS, BEVEL_INNER);
-	control_panel->w = 155;
-	control_panel->h = 155;
-	add_child(CONTAINER(game_panel), WIDGET(control_panel), 10, 5);
+	panel_init(&game_panel, 1, BEVEL_NONE);
+	game_panel.w = 181;
+	game_panel.h = 299;
+	add_child(&root, WIDGET(&game_panel), 550, 245);
+	panel_init(&control_panel, NUM_BUTTONS, BEVEL_INNER);
+	control_panel.w = 155;
+	control_panel.h = 155;
+	add_child(CONTAINER(&game_panel), WIDGET(&control_panel), 10, 5);
 	for (int i=0; i<NUM_BUTTONS; i++) {
-		b = malloc(sizeof *b);
+		struct button *b = &button[i];
 		button_init(b, (button_down_handler) button_cb[i]);
 		b->w = button_rect[i].w;
 		b->h = button_rect[i].h;
-		add_child(CONTAINER(control_panel), WIDGET(b), button_rect[i].x, button_rect[i].y);
+		add_child(CONTAINER(&control_panel), WIDGET(b), button_rect[i].x, button_rect[i].y);
 	}
 
 	for (int i=0; i<NUM_PALETTE_SPRITES; i++) {
 		palette_sprites[i] = sprites[palette_sprite_id[i]];
 	}
 
-	editor_palette = malloc(sizeof *editor_palette);
-	palette_init(editor_palette, 5, NUM_PALETTE_SPRITES, palette_sprites);
+	palette_init(&editor_palette, 5, NUM_PALETTE_SPRITES, palette_sprites);
 }
 
 int main(int argc, char **argv)
@@ -591,7 +644,7 @@ int main(int argc, char **argv)
 	init_gui(1);
 	populate_gui();
 
-	SDL_AddTimer(50, timer_callback, NULL);
+	game_timer = SDL_AddTimer(MS_PER_TICK, timer_callback, NULL);
 
 	// draw background
 	SDL_BlitSurface(bg, NULL, screen, NULL);

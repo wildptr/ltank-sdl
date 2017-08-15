@@ -23,7 +23,10 @@ void widget_init(struct widget *w, struct widget_class *class)
 
 void container_button_down(struct container *w, int button, int x, int y)
 {
-	for (int i=0; i<w->n_child; i++) {
+	/*
+	 * Iterate over children in reverse order since last child is on top.
+	 */
+	for (int i=w->n_child-1; i>=0; i--) {
 		struct child *c = &w->children[i];
 		struct widget *cw = c->w;
 		int dx = x - c->x;
