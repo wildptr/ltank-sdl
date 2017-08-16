@@ -52,8 +52,19 @@ struct button {
 	button_down_handler button_down;
 };
 
+struct image_widget {
+	WIDGET_FIELDS;
+	SDL_Texture *tex;
+};
+
+struct canvas {
+	WIDGET_FIELDS;
+	button_down_handler button_down;
+	paint_handler paint;
+};
+
 extern struct container root;
-extern struct SDL_Surface *screen;
+extern struct SDL_Renderer *renderer;
 
 void init_gui(int root_cap);
 void handle_button_down(SDL_MouseButtonEvent *e);
@@ -63,5 +74,7 @@ void widget_init(struct widget *w, struct widget_class *class);
 void container_init(struct container *w, int cap);
 void panel_init(struct panel *w, int cap, int bevel);
 void button_init(struct button *w, button_down_handler cb);
+void image_widget_init(struct image_widget *w, SDL_Texture *tex);
+void canvas_init(struct canvas *s);
 void draw_inner_bevel(SDL_Rect *r);
 void draw_outer_bevel(SDL_Rect *r);

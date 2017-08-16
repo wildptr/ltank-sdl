@@ -2,13 +2,18 @@
 
 #include "gui.h"
 
-struct container root;
+#define BLACK		  0,  0,  0,255
+#define DARK_GRAY	128,128,128,255
+#define LIGHT_GRAY	192,192,192,255
+#define WHITE		255,255,255,255
 
-Uint32 black, dark_gray, light_gray, white;
+struct container root;
 
 struct widget_class container_class;
 struct widget_class panel_class;
 struct widget_class button_class;
+struct widget_class image_widget_class;
+struct widget_class canvas_class;
 
 void widget_init(struct widget *w, struct widget_class *class)
 {
@@ -16,6 +21,8 @@ void widget_init(struct widget *w, struct widget_class *class)
 	w->h = 0;
 	w->class = class;
 }
+
+void null_handler() {}
 
 /*
  * Container class
@@ -61,7 +68,8 @@ void container_init(struct container *w, int cap)
 void panel_paint(struct panel *w, int x, int y)
 {
 	SDL_Rect dst = { x, y, w->w, w->h };
-	SDL_FillRect(screen, &dst, light_gray);
+	SDL_SetRenderDrawColor(renderer, LIGHT_GRAY);
+	SDL_RenderFillRect(renderer, &dst);
 
 	switch (w->bevel) {
 	case BEVEL_NONE:
@@ -111,14 +119,16 @@ void button_paint(struct button *w, int x, int y)
 	rect[1].w = 1;
 	rect[1].h = w->h-2;
 
-	SDL_FillRects(screen, rect, 2, white);
+	SDL_SetRenderDrawColor(renderer, WHITE);
+	SDL_RenderFillRects(renderer, rect, 2);
 
 	rect[0].x = x0+1;
 	rect[0].y = y0+1;
 	rect[0].w = w->w-3;
 	rect[0].h = w->h-3;
 
-	SDL_FillRect(screen, rect, light_gray);
+	SDL_SetRenderDrawColor(renderer, LIGHT_GRAY);
+	SDL_RenderFillRect(renderer, rect);
 
 	rect[0].x = x0+1;
 	rect[0].y = y1-2;
@@ -129,7 +139,8 @@ void button_paint(struct button *w, int x, int y)
 	rect[1].w = 1;
 	rect[1].h = w->h-2;
 
-	SDL_FillRects(screen, rect, 2, dark_gray);
+	SDL_SetRenderDrawColor(renderer, DARK_GRAY);
+	SDL_RenderFillRects(renderer, rect, 2);
 
 	rect[0].x = x0;
 	rect[0].y = y1-1;
@@ -140,13 +151,49 @@ void button_paint(struct button *w, int x, int y)
 	rect[1].w = 1;
 	rect[1].h = w->h;
 
-	SDL_FillRects(screen, rect, 2, black);
+	SDL_SetRenderDrawColor(renderer, BLACK);
+	SDL_RenderFillRects(renderer, rect, 2);
 }
 
 void button_init(struct button *w, button_down_handler cb)
 {
 	widget_init(WIDGET(w), &button_class);
 	w->button_down = cb;
+}
+
+/*
+ * Image widget class
+ */
+
+void image_widget_paint(struct image_widget *w, int x, int y)
+{
+	SDL_Rect dst = { x, y, w->w, w->h };
+	SDL_RenderCopy(renderer, w->tex, NULL, &dst);
+}
+
+void image_widget_init(struct image_widget *w, SDL_Texture *tex)
+{
+	widget_init(WIDGET(w), &image_widget_class);
+	w->tex = tex;
+}
+
+/*
+ * Canvas class
+ */
+
+void canvas_button_down(struct canvas *w, int button, int x, int y)
+{
+	w->button_down(WIDGET(w), button, x, y);
+}
+
+void canvas_paint(struct canvas *w, int x, int y)
+{
+	w->paint(WIDGET(w), x, y);
+}
+
+void canvas_init(struct canvas *w)
+{
+	widget_init(WIDGET(w), &canvas_class);
 }
 
 void init_gui(int root_cap)
@@ -164,18 +211,16 @@ void init_gui(int root_cap)
 	button_class.button_down = (button_down_handler) button_button_down;
 	button_class.paint = (paint_handler) button_paint;
 
+	image_widget_class.button_down = null_handler;
+	image_widget_class.paint = (paint_handler) image_widget_paint;
+
+	canvas_class.button_down = (button_down_handler) canvas_button_down;
+	canvas_class.paint = (paint_handler) canvas_paint;
+
 	/*
 	 * Initialize root widget
 	 */
 	container_init(&root, root_cap);
-
-	/*
-	 * Initialize colors.
-	 */
-	black      = SDL_MapRGB(screen->format,   0,   0,   0);
-	dark_gray  = SDL_MapRGB(screen->format, 128, 128, 128);
-	light_gray = SDL_MapRGB(screen->format, 192, 192, 192);
-	white      = SDL_MapRGB(screen->format, 255, 255, 255);
 };
 
 void draw_gui(void)
@@ -209,7 +254,8 @@ void draw_inner_bevel(SDL_Rect *r)
 	rr[1].w = 1;
 	rr[1].h = r->h-1;
 
-	SDL_FillRects(screen, rr, 2, dark_gray);
+	SDL_SetRenderDrawColor(renderer, DARK_GRAY);
+	SDL_RenderFillRects(renderer, rr, 2);
 
 	rr[0].x = r->x+1;
 	rr[0].y = r->y+r->h-1;
@@ -220,7 +266,8 @@ void draw_inner_bevel(SDL_Rect *r)
 	rr[1].w = 1;
 	rr[1].h = r->h-1;
 
-	SDL_FillRects(screen, rr, 2, white);
+	SDL_SetRenderDrawColor(renderer, WHITE);
+	SDL_RenderFillRects(renderer, rr, 2);
 }
 
 void draw_outer_bevel(SDL_Rect *r)
@@ -236,7 +283,8 @@ void draw_outer_bevel(SDL_Rect *r)
 	rr[1].w = 1;
 	rr[1].h = r->h-2;
 
-	SDL_FillRects(screen, rr, 2, white);
+	SDL_SetRenderDrawColor(renderer, WHITE);
+	SDL_RenderFillRects(renderer, rr, 2);
 
 	rr[0].x = r->x;
 	rr[0].y = r->y+r->h-1;
@@ -247,5 +295,6 @@ void draw_outer_bevel(SDL_Rect *r)
 	rr[1].w = 1;
 	rr[1].h = r->h;
 
-	SDL_FillRects(screen, rr, 2, dark_gray);
+	SDL_SetRenderDrawColor(renderer, DARK_GRAY);
+	SDL_RenderFillRects(renderer, rr, 2);
 }

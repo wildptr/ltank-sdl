@@ -17,6 +17,7 @@
  */
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -37,15 +38,11 @@
 
 #define MS_PER_TICK 50
 
-// prints error message if fails
-SDL_Surface *util_LoadBMP(const char *path);
-
 int load_graphic_set(const char *path);
 
-SDL_Surface *screen;
 SDL_Renderer *renderer;
-SDL_Texture *texture;
-SDL_Surface *sprites[60];
+SDL_Texture *sprites[60];
+SDL_Texture *bg_tex;
 
 int num_levels;
 struct level *levels;
@@ -55,6 +52,11 @@ bool anim_on;
 int anim_delay;
 int anim_phase;
 
+/*
+ * GUI widgets
+ */
+struct image_widget bg_image_widget;
+struct canvas board_canvas;
 struct panel game_panel;
 struct panel control_panel;
 struct palette editor_palette;
@@ -65,8 +67,7 @@ SDL_TimerID game_timer;
 
 void render(void)
 {
-	SDL_UpdateTexture(texture, NULL, screen->pixels, screen->pitch);
-	SDL_RenderCopy(renderer, texture, NULL, NULL);
+	draw_gui();
 	SDL_RenderPresent(renderer);
 }
 
@@ -78,7 +79,7 @@ void open_editor(void)
 	editor_on = true;
 }
 
-uint32_t timer_callback(Uint32 interval, void *param);
+Uint32 timer_callback(Uint32 interval, void *param);
 
 void close_editor(void)
 {
@@ -217,7 +218,7 @@ int get_sprite_id(uint8_t obj, int anim_phase)
 void draw_tile(int y, int x, int anim_phase)
 {
 	struct tile *t = &board[y][x];
-	SDL_Surface *bg, *fg;
+	SDL_Texture *bg, *fg;
 
 	SDL_Rect dst;
 	dst.x = BOARD_X + x*32;
@@ -226,10 +227,10 @@ void draw_tile(int y, int x, int anim_phase)
 	dst.h = 32;
 
 	bg = sprites[get_sprite_id(t->bg, anim_phase)];
-	SDL_BlitSurface(bg, NULL, screen, &dst);
+	SDL_RenderCopy(renderer, bg, NULL, &dst);
 	if (t->fg) {
 		fg = sprites[get_sprite_id(t->fg, anim_phase)];
-		SDL_BlitSurface(fg, NULL, screen, &dst);
+		SDL_RenderCopy(renderer, fg, NULL, &dst);
 	}
 }
 
@@ -243,7 +244,7 @@ void draw_tank(void)
 	dst.w = 32;
 	dst.h = 32;
 
-	SDL_BlitSurface(sprites[sprite_id], NULL, screen, &dst);
+	SDL_RenderCopy(renderer, sprites[sprite_id], NULL, &dst);
 }
 
 void draw_laser(const struct laser *l)
@@ -254,10 +255,11 @@ void draw_laser(const struct laser *l)
 	int color = l->style >> 4;
 	int shape = l->style & 15;
 
-	uint32_t sdl_color = SDL_MapRGB(screen->format,
-					((color>>0)&1)*255,
-					((color>>1)&1)*255,
-					((color>>2)&1)*255);
+	uint8_t r = ((color>>0)&1)*255;
+	uint8_t g = ((color>>1)&1)*255;
+	uint8_t b = ((color>>2)&1)*255;
+
+	SDL_SetRenderDrawColor(renderer, r, g, b, 255);
 
 	SDL_Rect dst, dst1, dst2;
 	dst.x = BOARD_X + x*32;
@@ -323,12 +325,12 @@ void draw_laser(const struct laser *l)
 		dst.h = 2;
 	}
 
-	SDL_FillRect(screen, &dst, sdl_color);
+	SDL_RenderFillRect(renderer, &dst);
 	return;
 
 l:
-	SDL_FillRect(screen, &dst1, sdl_color);
-	SDL_FillRect(screen, &dst2, sdl_color);
+	SDL_RenderFillRect(renderer, &dst1);
+	SDL_RenderFillRect(renderer, &dst2);
 }
 
 /*
@@ -336,7 +338,7 @@ l:
  * problems, push a "timer" event into the event queue and handle it in the
  * event loop.
  */
-uint32_t timer_callback(Uint32 interval, void *param)
+Uint32 timer_callback(Uint32 interval, void *param)
 {
 	SDL_Event event;
 	SDL_UserEvent userevent;
@@ -370,14 +372,14 @@ void draw_board(void)
 
 void editor_place_object(int obj, int y, int x)
 {
-	int old_tank_y = tank_y;
-	int old_tank_x = tank_x;
+	//int old_tank_y = tank_y;
+	//int old_tank_x = tank_x;
 	place_object(obj, y, x);
-	draw_tile(y, x, 0);
+	//draw_tile(y, x, 0);
 	if (obj == 1 /* tank */) {
 		tank_alive = true;
-		draw_tile(old_tank_y, old_tank_x, 0);
-		draw_tank();
+		//draw_tile(old_tank_y, old_tank_x, 0);
+		//draw_tank();
 	}
 }
 
@@ -426,38 +428,12 @@ l:
 				} else {
 					open_editor();
 				}
-				draw_gui();
 				render();
 				break;
 			}
 			break;
 		case SDL_MOUSEBUTTONDOWN:
-			switch (e.button.button) {
-				int dx, dy;
-				//int b;
-			case SDL_BUTTON_LEFT:
-			case SDL_BUTTON_RIGHT:
-				dx = e.button.x - BOARD_X;
-				dy = e.button.y - BOARD_Y;
-				if ((dx|dy)>>9 == 0) {
-					if (editor_on) {
-						int cy = dy >> 5;
-						int cx = dx >> 5;
-						int obj;
-						if (e.button.button == SDL_BUTTON_LEFT) {
-							obj = editor_palette.selection1;
-						} else {
-							obj = editor_palette.selection2;
-						}
-						editor_place_object(obj, cy, cx);
-						render();
-					} else {
-					}
-				} else {
-					handle_button_down(&e.button);
-				}
-				break;
-			}
+			handle_button_down(&e.button);
 			break;
 		case SDL_MOUSEMOTION:
 			if (e.motion.state & (SDL_BUTTON_LMASK|SDL_BUTTON_RMASK)) {
@@ -488,7 +464,6 @@ l:
 						anim_phase = (anim_phase+1)%3;
 					}
 				}
-				draw_board();
 				render();
 			}
 			break;
@@ -513,6 +488,28 @@ void cb_next_level_button()
 	if (current_level < num_levels) {
 		current_level++;
 		start_level();
+	}
+}
+
+void board_canvas_button_down(struct canvas *w, int button, int x, int y)
+{
+	switch (button) {
+	case SDL_BUTTON_LEFT:
+	case SDL_BUTTON_RIGHT:
+		if (editor_on) {
+			int cy = y >> 5;
+			int cx = x >> 5;
+			int obj;
+			if (button == SDL_BUTTON_LEFT) {
+				obj = editor_palette.selection1;
+			} else {
+				obj = editor_palette.selection2;
+			}
+			editor_place_object(obj, cy, cx);
+			render();
+		} else {
+		}
+		break;
 	}
 }
 
@@ -550,9 +547,21 @@ void populate_gui(void)
 		46,47,48,49,55,
 		56,
 	};
-	static SDL_Surface *palette_sprites[NUM_PALETTE_SPRITES];
+	static SDL_Texture *palette_sprites[NUM_PALETTE_SPRITES];
 
 	static struct button button[NUM_BUTTONS];
+
+	image_widget_init(&bg_image_widget, bg_tex);
+	bg_image_widget.w = WINDOW_W;
+	bg_image_widget.h = WINDOW_H;
+	add_child(&root, WIDGET(&bg_image_widget), 0, 0);
+
+	canvas_init(&board_canvas);
+	board_canvas.w = 512;
+	board_canvas.h = 512;
+	board_canvas.button_down = (button_down_handler) board_canvas_button_down;
+	board_canvas.paint = (paint_handler) draw_board;
+	add_child(&root, WIDGET(&board_canvas), BOARD_X, BOARD_Y);
 
 	// control panel absolute coordinates (bevel included): 560 250 715 405
 
@@ -579,30 +588,27 @@ void populate_gui(void)
 	palette_init(&editor_palette, 5, NUM_PALETTE_SPRITES, palette_sprites);
 }
 
+SDL_Texture *load_texture(const char *path)
+{
+	SDL_Surface *s = IMG_Load(path);
+	if (s == NULL) {
+		fprintf(stderr, "Unable to load image %s: %s\n",
+			path, IMG_GetError());
+		return NULL;
+	}
+	SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, s);
+	return tex;
+}
+
 int main(int argc, char **argv)
 {
 	// same as data/bg.bmp
 	int w = WINDOW_W;
 	int h = WINDOW_H;
-	SDL_Surface *bg;
 
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
 		fprintf(stderr, "Unable to initialize SDL: %s\n",
 			SDL_GetError());
-		return 1;
-	}
-
-	/*
-	 * Load resources.
-	 */
-	bg = util_LoadBMP("data/bg.bmp");
-	if (bg == NULL) {
-		return 1;
-	}
-	if (load_level_set("data/LaserTank.lvl") < 0) {
-		return 1;
-	}
-	if (load_graphic_set("data/default.ltg") < 0) {
 		return 1;
 	}
 
@@ -623,21 +629,15 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	//SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
-	screen = SDL_CreateRGBSurface(0, w, h, 32,
-				      0x00FF0000,
-				      0x0000FF00,
-				      0x000000FF,
-				      0xFF000000);
-	if (screen == NULL) {
+	/*
+	 * Load resources (after creating renderer).
+	 */
+	bg_tex = load_texture("data/bg.bmp");
+	if (bg_tex == NULL) return 1;
+	if (load_level_set("data/LaserTank.lvl") < 0) {
 		return 1;
 	}
-
-	texture = SDL_CreateTexture(renderer,
-				    SDL_PIXELFORMAT_ARGB8888,
-				    SDL_TEXTUREACCESS_STREAMING,
-				    w, h);
-	if (texture == NULL) {
+	if (load_graphic_set("data/default.ltg") < 0) {
 		return 1;
 	}
 
@@ -646,15 +646,9 @@ int main(int argc, char **argv)
 
 	game_timer = SDL_AddTimer(MS_PER_TICK, timer_callback, NULL);
 
-	// draw background
-	SDL_BlitSurface(bg, NULL, screen, NULL);
-
-	draw_gui();
-
 	anim_on = true;
 	current_level = 0;
 	start_level();
-	draw_board();
 
 	render();
 

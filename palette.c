@@ -36,7 +36,7 @@ void palette_paint(struct palette *w, int x, int y)
 			bevel.y = y + 36*cell_y;
 			dst.x = bevel.x + 1;
 			dst.y = bevel.y + 1;
-			SDL_BlitSurface(w->sprites[i], NULL, screen, &dst);
+			SDL_RenderCopy(renderer, w->sprites[i], NULL, &dst);
 			draw_outer_bevel(&bevel);
 			i++;
 		}
@@ -48,7 +48,7 @@ struct widget_class palette_class = {
 	(paint_handler) palette_paint,
 };
 
-void palette_init(struct palette *w, int n_col, int n_sprite, SDL_Surface **sprites)
+void palette_init(struct palette *w, int n_col, int n_sprite, SDL_Texture **sprites)
 {
 	widget_init(WIDGET(w), &palette_class);
 	int n_row = (n_sprite+n_col-1)/n_col;

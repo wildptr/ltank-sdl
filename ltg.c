@@ -9,7 +9,8 @@ struct ltg_header {
 	int32_t mask_offset;
 };
 
-extern SDL_Surface *sprites[60];
+extern SDL_Renderer *renderer;
+extern SDL_Texture *sprites[60];
 
 int load_graphic_set(const char *path)
 {
@@ -87,7 +88,6 @@ int load_graphic_set(const char *path)
 				 0x0000ff00,
 				 0x00ff0000,
 				 0xff000000);
-			sprites[i] = sprite;
 			SDL_SetSurfaceBlendMode(sprite, SDL_BLENDMODE_BLEND);
 			src.x = x*32;
 			src.y = y*32;
@@ -108,6 +108,8 @@ int load_graphic_set(const char *path)
 				SDL_UnlockSurface(tmp_surf);
 				SDL_UnlockSurface(sprite);
 			}
+			sprites[i] = SDL_CreateTextureFromSurface(renderer, sprite);
+			SDL_FreeSurface(sprite);
 			i++;
 		}
 	}
