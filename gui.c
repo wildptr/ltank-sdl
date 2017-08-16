@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 
 #include "gui.h"
 
@@ -14,6 +15,7 @@ struct widget_class panel_class;
 struct widget_class button_class;
 struct widget_class image_widget_class;
 struct widget_class canvas_class;
+struct widget_class text_widget_class;
 
 void widget_init(struct widget *w, struct widget_class *class)
 {
@@ -196,6 +198,54 @@ void canvas_init(struct canvas *w)
 	widget_init(WIDGET(w), &canvas_class);
 }
 
+/*
+ * Text widget class
+ */
+
+void text_widget_paint(struct text_widget *w, int x, int y)
+{
+	SDL_Texture *tex = w->tex;
+	if (tex == NULL) return;
+	int font_height = TTF_FontHeight(font);
+	SDL_Rect dst;
+	dst.x = x + (w->w-w->tex_w)/2;
+	dst.y = y + (w->h-font_height)/2;
+	dst.w = w->tex_w;
+	dst.h = w->tex_h;
+	SDL_RenderCopy(renderer, tex, NULL, &dst);
+}
+
+void text_widget_init(struct text_widget *w)
+{
+	widget_init(WIDGET(w), &text_widget_class);
+	w->text = NULL;
+	w->color.r = 255;
+	w->color.g = 255;
+	w->color.b = 255;
+	w->color.a = 255;
+	w->style = 0;
+	w->tex = NULL;
+}
+
+void text_widget_set_text(struct text_widget *w, const char *text)
+{
+	if (w->tex) {
+		SDL_DestroyTexture(w->tex);
+	}
+	w->text = text;
+	if (text != NULL) {
+		SDL_Surface *s = TTF_RenderText_Blended(font, w->text, w->color);
+		w->tex = SDL_CreateTextureFromSurface(renderer, s);
+		w->tex_w = s->w;
+		w->tex_h = s->h;
+		SDL_FreeSurface(s);
+	} else {
+		w->tex = NULL;
+		w->tex_w = 0;
+		w->tex_h = 0;
+	}
+}
+
 void init_gui(int root_cap)
 {
 	/*
@@ -216,6 +266,9 @@ void init_gui(int root_cap)
 
 	canvas_class.button_down = (button_down_handler) canvas_button_down;
 	canvas_class.paint = (paint_handler) canvas_paint;
+
+	text_widget_class.button_down = null_handler;
+	text_widget_class.paint = (paint_handler) text_widget_paint;
 
 	/*
 	 * Initialize root widget

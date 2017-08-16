@@ -18,6 +18,7 @@
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_ttf.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -43,6 +44,7 @@ int load_graphic_set(const char *path);
 SDL_Renderer *renderer;
 SDL_Texture *sprites[60];
 SDL_Texture *bg_tex;
+TTF_Font *font;
 
 int num_levels;
 struct level *levels;
@@ -60,6 +62,7 @@ struct canvas board_canvas;
 struct panel game_panel;
 struct panel control_panel;
 struct palette editor_palette;
+struct text_widget level_name_text, level_author_text;
 
 bool editor_on;
 
@@ -145,6 +148,8 @@ void start_level(void)
 	if (editor_on) {
 		close_editor();
 	}
+	text_widget_set_text(&level_name_text, l->name);
+	text_widget_set_text(&level_author_text, l->author);
 }
 
 int get_sprite_id(uint8_t obj, int anim_phase)
@@ -563,6 +568,16 @@ void populate_gui(void)
 	board_canvas.paint = (paint_handler) draw_board;
 	add_child(&root, WIDGET(&board_canvas), BOARD_X, BOARD_Y);
 
+	text_widget_init(&level_name_text);
+	level_name_text.w = 164;
+	level_name_text.h = 22;
+	add_child(&root, WIDGET(&level_name_text), 559, 99);
+
+	text_widget_init(&level_author_text);
+	level_author_text.w = 164;
+	level_author_text.h = 22;
+	add_child(&root, WIDGET(&level_author_text), 559, 148);
+
 	// control panel absolute coordinates (bevel included): 560 250 715 405
 
 	panel_init(&game_panel, 1, BEVEL_NONE);
@@ -612,6 +627,12 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (TTF_Init() < 0) {
+		fprintf(stderr, "Unable to initialize SDL_ttf: %s\n",
+			TTF_GetError());
+		return 1;
+	}
+
 	SDL_Window *window = SDL_CreateWindow("Laser Tank",
 					      SDL_WINDOWPOS_UNDEFINED,
 					      SDL_WINDOWPOS_UNDEFINED,
@@ -640,6 +661,8 @@ int main(int argc, char **argv)
 	if (load_graphic_set("data/default.ltg") < 0) {
 		return 1;
 	}
+	font = TTF_OpenFont("data/arial.ttf", 12);
+	if (font == NULL) return 1;
 
 	init_gui(1);
 	populate_gui();
@@ -654,6 +677,7 @@ int main(int argc, char **argv)
 
 	event_loop();
 
+	TTF_Quit();
 	SDL_Quit();
 
 	return 0;

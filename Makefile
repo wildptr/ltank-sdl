@@ -3,7 +3,7 @@ TARGET := ltank
 OBJECTS := game.o gui.o level.o ltg.o main.o palette.o util.o
 
 $(TARGET): $(OBJECTS)
-	$(CC) $^ -o $@ -L/usr/local/lib -lSDL2 -lSDL2_image
+	$(CC) $^ -o $@ -L/usr/local/lib -lSDL2 -lSDL2_image -lSDL2_ttf
 
 game.o: game.c game.h
 gui.o: gui.c gui.h
