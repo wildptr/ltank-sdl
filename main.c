@@ -148,8 +148,8 @@ void start_level(void)
 	if (editor_on) {
 		close_editor();
 	}
-	text_widget_set_text(&level_name_text, l->name);
-	text_widget_set_text(&level_author_text, l->author);
+	text_area_set_text(&level_name_text.text_area, l->name);
+	text_area_set_text(&level_author_text.text_area, l->author);
 }
 
 int get_sprite_id(uint8_t obj, int anim_phase)
@@ -593,6 +593,14 @@ void populate_gui(void)
 		button_init(b, (button_down_handler) button_cb[i]);
 		b->w = button_rect[i].w;
 		b->h = button_rect[i].h;
+		switch (i) {
+		case 7:
+			text_area_set_text(&b->caption, "<< Level");
+			break;
+		case 8:
+			text_area_set_text(&b->caption, "Level >>");
+			break;
+		}
 		add_child(CONTAINER(&control_panel), WIDGET(b), button_rect[i].x, button_rect[i].y);
 	}
 
@@ -661,7 +669,7 @@ int main(int argc, char **argv)
 	if (load_graphic_set("data/default.ltg") < 0) {
 		return 1;
 	}
-	font = TTF_OpenFont("data/arial.ttf", 12);
+	font = TTF_OpenFont("data/arial.ttf", 13);
 	if (font == NULL) return 1;
 
 	init_gui(1);
