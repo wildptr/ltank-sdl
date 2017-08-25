@@ -159,51 +159,46 @@ void button_paint(struct button *w, int x, int y)
 	int x1 = x + w->w;
 	int y1 = y + w->h;
 
-	SDL_Rect rect[2];
+	SDL_Point pt[3];
+	SDL_Rect rect;
 
-	rect[0].x = x0;
-	rect[0].y = y0;
-	rect[0].w = w->w-1;
-	rect[0].h = 1;
-	rect[1].x = x0;
-	rect[1].y = y0+1;
-	rect[1].w = 1;
-	rect[1].h = w->h-2;
+	pt[0].x = x0;
+	pt[0].y = y1-2;
+	pt[1].x = x0;
+	pt[1].y = y0;
+	pt[2].x = x1-2;
+	pt[2].y = y0;
 
 	SDL_SetRenderDrawColor(renderer, WHITE);
-	SDL_RenderFillRects(renderer, rect, 2);
+	SDL_RenderDrawLines(renderer, pt, 3);
 
-	rect[0].x = x0+1;
-	rect[0].y = y0+1;
-	rect[0].w = w->w-3;
-	rect[0].h = w->h-3;
+	rect.x = x0+1;
+	rect.y = y0+1;
+	rect.w = w->w-3;
+	rect.h = w->h-3;
 
 	SDL_SetRenderDrawColor(renderer, LIGHT_GRAY);
-	SDL_RenderFillRect(renderer, rect);
+	SDL_RenderFillRect(renderer, &rect);
 
-	rect[0].x = x0+1;
-	rect[0].y = y1-2;
-	rect[0].w = w->w-2;
-	rect[0].h = 1;
-	rect[1].x = x1-2;
-	rect[1].y = y0+1;
-	rect[1].w = 1;
-	rect[1].h = w->h-2;
+	pt[0].x = x0+1;
+	pt[0].y = y1-2;
+	pt[1].x = x1-2;
+	pt[1].y = y1-2;
+	pt[2].x = x1-2;
+	pt[2].y = y0+1;
 
 	SDL_SetRenderDrawColor(renderer, DARK_GRAY);
-	SDL_RenderFillRects(renderer, rect, 2);
+	SDL_RenderDrawLines(renderer, pt, 3);
 
-	rect[0].x = x0;
-	rect[0].y = y1-1;
-	rect[0].w = w->w;
-	rect[0].h = 1;
-	rect[1].x = x1-1;
-	rect[1].y = y0;
-	rect[1].w = 1;
-	rect[1].h = w->h;
+	pt[0].x = x1-1;
+	pt[0].y = y0;
+	pt[1].x = x1-1;
+	pt[1].y = y1-1;
+	pt[2].x = x0;
+	pt[2].y = y1-1;
 
 	SDL_SetRenderDrawColor(renderer, BLACK);
-	SDL_RenderFillRects(renderer, rect, 2);
+	SDL_RenderDrawLines(renderer, pt, 3);
 
 	text_area_paint(&w->caption, x, y, w->w, w->h);
 }
@@ -314,58 +309,60 @@ void handle_button_down(SDL_MouseButtonEvent *e)
 
 void draw_inner_bevel(SDL_Rect *r)
 {
-	SDL_Rect rr[2];
+	SDL_Point pt[3];
 
-	rr[0].x = r->x;
-	rr[0].y = r->y;
-	rr[0].w = r->w;
-	rr[0].h = 1;
-	rr[1].x = r->x;
-	rr[1].y = r->y+1;
-	rr[1].w = 1;
-	rr[1].h = r->h-1;
+	int x0 = r->x;
+	int y0 = r->y;
+	int x1 = x0 + r->w;
+	int y1 = y0 + r->h;
+
+	pt[0].x = x0;
+	pt[0].y = y1-2;
+	pt[1].x = x0;
+	pt[1].y = y0;
+	pt[2].x = x1-2;
+	pt[2].y = y0;
 
 	SDL_SetRenderDrawColor(renderer, DARK_GRAY);
-	SDL_RenderFillRects(renderer, rr, 2);
+	SDL_RenderDrawLines(renderer, pt, 3);
 
-	rr[0].x = r->x+1;
-	rr[0].y = r->y+r->h-1;
-	rr[0].w = r->w-1;
-	rr[0].h = 1;
-	rr[1].x = r->x+r->w-1;
-	rr[1].y = r->y+1;
-	rr[1].w = 1;
-	rr[1].h = r->h-1;
+	pt[0].x = x1-1;
+	pt[0].y = y0;
+	pt[1].x = x1-1;
+	pt[1].y = y1-1;
+	pt[2].x = x0;
+	pt[2].y = y1-1;
 
 	SDL_SetRenderDrawColor(renderer, WHITE);
-	SDL_RenderFillRects(renderer, rr, 2);
+	SDL_RenderDrawLines(renderer, pt, 3);
 }
 
 void draw_outer_bevel(SDL_Rect *r)
 {
-	SDL_Rect rr[2];
+	SDL_Point pt[3];
 
-	rr[0].x = r->x;
-	rr[0].y = r->y;
-	rr[0].w = r->w-1;
-	rr[0].h = 1;
-	rr[1].x = r->x;
-	rr[1].y = r->y+1;
-	rr[1].w = 1;
-	rr[1].h = r->h-2;
+	int x0 = r->x;
+	int y0 = r->y;
+	int x1 = x0 + r->w;
+	int y1 = y0 + r->h;
+
+	pt[0].x = x0;
+	pt[0].y = y1-2;
+	pt[1].x = x0;
+	pt[1].y = y0;
+	pt[2].x = x1-2;
+	pt[2].y = y0;
 
 	SDL_SetRenderDrawColor(renderer, WHITE);
-	SDL_RenderFillRects(renderer, rr, 2);
+	SDL_RenderDrawLines(renderer, pt, 3);
 
-	rr[0].x = r->x;
-	rr[0].y = r->y+r->h-1;
-	rr[0].w = r->w;
-	rr[0].h = 1;
-	rr[1].x = r->x+r->w-1;
-	rr[1].y = r->y;
-	rr[1].w = 1;
-	rr[1].h = r->h;
+	pt[0].x = x1-1;
+	pt[0].y = y0;
+	pt[1].x = x1-1;
+	pt[1].y = y1-1;
+	pt[2].x = x0;
+	pt[2].y = y1-1;
 
 	SDL_SetRenderDrawColor(renderer, DARK_GRAY);
-	SDL_RenderFillRects(renderer, rr, 2);
+	SDL_RenderDrawLines(renderer, pt, 3);
 }
