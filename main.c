@@ -373,6 +373,10 @@ void draw_board(void)
 	for (int i=0; i<num_lasers; i++) {
 		draw_laser(&lasers[i]);
 	}
+	for (int i=0; i<num_visual_lasers; i++) {
+		draw_laser(&visual_lasers[i]);
+	}
+	num_visual_lasers = 0;
 }
 
 void editor_place_object(int obj, int y, int x)

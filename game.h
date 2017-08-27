@@ -74,8 +74,8 @@ extern int tank_y, tank_x;
 extern int tank_orient;
 extern int tank_action;
 extern bool tank_alive;
-extern int num_lasers;
-extern struct laser lasers[];
+extern int num_lasers, num_visual_lasers;
+extern struct laser lasers[], visual_lasers[];
 extern bool active;
 
 void tick(void);

@@ -10,8 +10,8 @@ int tank_y, tank_x;
 int tank_orient;
 int tank_action;
 bool tank_alive;
-int num_lasers;
-struct laser lasers[MAX_LASERS];
+int num_lasers, num_visual_lasers;
+struct laser lasers[MAX_LASERS], visual_lasers[256];
 bool active;
 
 static int Dx[4] = {0,1,0,-1};
@@ -275,7 +275,18 @@ void tick(void)
 		if (num_lasers < MAX_LASERS) {
 			int y = tank_y;
 			int x = tank_x;
-			add_laser(y, x, 2, tank_orient);
+			struct laser *l = add_laser(y, x, 2, tank_orient);
+			// this loop implements instantaneous firing
+			while (l->dir >= 0) {
+				update_laser(l);
+				if (!board[l->y][l->x].fg) {
+					struct laser *vl =
+						&visual_lasers[num_visual_lasers++];
+					vl->y = l->y;
+					vl->x = l->x;
+					vl->style = l->style;
+				}
+			}
 		}
 		tank_action = 0;
 	}
