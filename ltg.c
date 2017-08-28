@@ -118,7 +118,7 @@ int load_graphic_set(const char *path)
 
 	ret = 0;
 
-cleanup4:
+//cleanup4:
 	SDL_FreeRW(mask_rw);
 cleanup3:
 	SDL_FreeRW(color_rw);
