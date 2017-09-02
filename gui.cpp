@@ -6,21 +6,27 @@
 #define BLACK		  0,  0,  0,255
 #define DARK_GRAY	128,128,128,255
 #define LIGHT_GRAY	192,192,192,255
+#define GRAY_224  	224,224,224,255
 #define WHITE		255,255,255,255
 
 extern TTF_Font *font;
 
+// After init_gui(), this is always non-null.
+//static Widget *widget_under_cursor;
+static Widget *widget_capturing_mouse;
+
 static void draw_inner_bevel(SDL_Rect *r);
 static void draw_outer_bevel(SDL_Rect *r);
+static void draw_button_border(bool depressed, SDL_Rect *r);
+static Widget *widget_at(int x, int y);
+static void capture_mouse(Widget *w);
+static void release_mouse();
 
 Container *root;
 
 /*
  * Widget class
  */
-
-void Widget::button_down(int button, int x, int y) {}
-void Widget::paint(int x, int y) {}
 
 void Widget::set_size(int w, int h)
 {
@@ -91,47 +97,42 @@ void Container::button_down(int button, int x, int y)
      * Iterate over children in reverse order since last child is on top.
      */
     for (int i=n_child_-1; i>=0; i--) {
-        child *c = &children_[i];
-        Widget *cw = c->w;
-        int dx = x - c->x;
+        Widget *cw = children_[i];
+        int dx = x - (cw->x_ - x_);
         if (dx < 0 || dx >= cw->w_) continue;
-        int dy = y - c->y;
+        int dy = y - (cw->y_ - y_);
         if (dy < 0 || dy >= cw->h_) continue;
         cw->button_down(button, dx, dy);
         break;
     }
 }
 
-void Container::paint(int x, int y)
+void Container::paint()
 {
-    for (int i=0; i<n_child_; i++) {
-        child *c = &children_[i];
-        Widget *cw = c->w;
-        cw->paint(x + c->x, y + c->y);
-    }
+    for (int i=0; i<n_child_; i++)
+        children_[i]->paint();
 }
 
 Container::Container(int cap)
 {
-    children_ = new child[cap];
+    children_ = new Widget*[cap];
     n_child_ = 0;
 }
 
 void Container::add_child(Widget *cw, int x, int y)
 {
-    child *c = &children_[n_child_++];
-    c->w = cw;
-    c->x = x;
-    c->y = y;
+    cw->x_ = x_ + x;
+    cw->y_ = y_ + y;
+    children_[n_child_++] = cw;
 }
 
 /*
  * Panel class
  */
 
-void Panel::paint(int x, int y)
+void Panel::paint()
 {
-    SDL_Rect dst = { x, y, w_, h_ };
+    SDL_Rect dst = { x_, y_, w_, h_ };
     SDL_SetRenderDrawColor(renderer, LIGHT_GRAY);
     SDL_RenderFillRect(renderer, &dst);
 
@@ -146,7 +147,7 @@ void Panel::paint(int x, int y)
         break;
     }
 
-    Container::paint(x, y);
+    Container::paint();
 }
 
 Panel::Panel(int cap, Bevel bevel): Container(cap), bevel_(bevel) {}
@@ -157,61 +158,69 @@ Panel::Panel(int cap, Bevel bevel): Container(cap), bevel_(bevel) {}
 
 void Button::button_down(int button, int x, int y)
 {
-    button_down_(this, button, x, y);
+    if (button == SDL_BUTTON_LEFT) {
+        depressed_ = true;
+        left_button_down_ = true;
+        //click_(this, button, x, y);
+        paint();
+        capture_mouse(this);
+    }
 }
 
-void Button::paint(int x, int y)
+void Button::button_up(int button, int x, int y)
 {
-    int x0 = x;
-    int y0 = y;
-    int x1 = x + w_;
-    int y1 = y + h_;
-
-    SDL_Point pt[3];
-    SDL_Rect r;
-
-    pt[0].x = x0;
-    pt[0].y = y1-2;
-    pt[1].x = x0;
-    pt[1].y = y0;
-    pt[2].x = x1-2;
-    pt[2].y = y0;
-
-    SDL_SetRenderDrawColor(renderer, WHITE);
-    SDL_RenderDrawLines(renderer, pt, 3);
-
-    r.x = x0+1;
-    r.y = y0+1;
-    r.w = w_-3;
-    r.h = h_-3;
-
-    SDL_SetRenderDrawColor(renderer, LIGHT_GRAY);
-    SDL_RenderFillRect(renderer, &r);
-
-    pt[0].x = x0+1;
-    pt[0].y = y1-2;
-    pt[1].x = x1-2;
-    pt[1].y = y1-2;
-    pt[2].x = x1-2;
-    pt[2].y = y0+1;
-
-    SDL_SetRenderDrawColor(renderer, DARK_GRAY);
-    SDL_RenderDrawLines(renderer, pt, 3);
-
-    pt[0].x = x1-1;
-    pt[0].y = y0;
-    pt[1].x = x1-1;
-    pt[1].y = y1-1;
-    pt[2].x = x0;
-    pt[2].y = y1-1;
-
-    SDL_SetRenderDrawColor(renderer, BLACK);
-    SDL_RenderDrawLines(renderer, pt, 3);
-
-    caption_.paint(x, y, w_, h_);
+    if (left_button_down_ && button == SDL_BUTTON_LEFT) {
+        left_button_down_ = false;
+        if (depressed_) {
+            depressed_ = false;
+            click_(this, button, x, y);
+        }
+        paint();
+        release_mouse();
+    }
 }
 
-Button::Button(button_down_handler cb): button_down_(cb) {}
+void Button::mouse_move(int x, int y)
+{
+    if (left_button_down_) {
+        bool depressed_now = x >= 0 && x < w_ && y >= 0 && y < h_;
+        if (depressed_ != depressed_now) {
+            depressed_ = depressed_now;
+            paint();
+        }
+    }
+}
+
+#if 0
+void Button::mouse_leave()
+{
+    if (left_button_down_) {
+        depressed_ = false;
+        paint();
+    }
+}
+
+void Button::mouse_enter()
+{
+    if (left_button_down_) {
+        depressed_ = true;
+        paint();
+    }
+}
+#endif
+
+void Button::paint()
+{
+    SDL_Rect r = { x_, y_, w_, h_ };
+    draw_button_border(depressed_, &r);
+    int d = depressed_ ? 1 : 0;
+    caption_.paint(x_+d, y_+d, w_, h_);
+}
+
+Button::Button(button_down_handler cb):
+    depressed_(false),
+    left_button_down_(false),
+    click_(cb) {}
 
 void Button::set_text(const char *s)
 {
@@ -222,9 +231,9 @@ void Button::set_text(const char *s)
  * Image widget class
  */
 
-void ImageWidget::paint(int x, int y)
+void ImageWidget::paint()
 {
-    SDL_Rect dst = { x, y, w_, h_ };
+    SDL_Rect dst = { x_, y_, w_, h_ };
     SDL_RenderCopy(renderer, tex_, NULL, &dst);
 }
 
@@ -239,18 +248,18 @@ void Canvas::button_down(int button, int x, int y)
     button_down_(this, button, x, y);
 }
 
-void Canvas::paint(int x, int y)
+void Canvas::paint()
 {
-    paint_(this, x, y);
+    paint_(this);
 }
 
 /*
  * Text widget class
  */
 
-void TextWidget::paint(int x, int y)
+void TextWidget::paint()
 {
-    text_area_.paint(x, y, w_, h_);
+    text_area_.paint(x_, y_, w_, h_);
 }
 
 void TextWidget::set_text(const char *s)
@@ -270,16 +279,49 @@ void TextWidget::set_text_color(Uint8 r, Uint8 g, Uint8 b, Uint8 a)
 void init_gui(int root_cap)
 {
     root = new Container(root_cap);
+#if 0
+    widget_under_cursor = root;
+#endif
 }
 
 void draw_gui()
 {
-    root->paint(0, 0);
+    root->paint();
 }
 
 void handle_button_down(SDL_MouseButtonEvent *e)
 {
-    root->button_down(e->button, e->x, e->y);
+    Widget *w = widget_at(e->x, e->y);
+    w->button_down(e->button, e->x - w->x_, e->y - w->y_);
+}
+
+void handle_button_up(SDL_MouseButtonEvent *e)
+{
+    Widget *w;
+    if (widget_capturing_mouse) {
+        w = widget_capturing_mouse;
+    } else {
+        w = widget_at(e->x, e->y);
+    }
+    w->button_up(e->button, e->x - w->x_, e->y - w->y_);
+}
+
+void handle_mouse_motion(SDL_MouseMotionEvent *e)
+{
+    Widget *w;
+    if (widget_capturing_mouse) {
+        w = widget_capturing_mouse;
+    } else {
+        w = widget_at(e->x, e->y);
+    }
+    w->mouse_move(e->x - w->x_, e->y - w->y_);
+#if 0
+    if (widget_under_cursor != w) {
+        widget_under_cursor->mouse_leave();
+        w->mouse_enter();
+    }
+    widget_under_cursor = w;
+#endif
 }
 
 /*
@@ -367,7 +409,7 @@ void Palette::button_down(int button, int x, int y)
     }
 }
 
-void Palette::paint(int x, int y)
+void Palette::paint()
 {
     SDL_Rect dst, bevel;
     dst.w = 32;
@@ -379,8 +421,8 @@ void Palette::paint(int x, int y)
     for (int cell_y = 0; cell_y < n_row_; cell_y++) {
         for (int cell_x = 0; cell_x < n_col_; cell_x++) {
             if (i >= n_sprite_) break;
-            bevel.x = x + 36*cell_x;
-            bevel.y = y + 36*cell_y;
+            bevel.x = x_ + 36*cell_x;
+            bevel.y = y_ + 36*cell_y;
             dst.x = bevel.x + 1;
             dst.y = bevel.y + 1;
             SDL_RenderCopy(renderer, sprites_[i], NULL, &dst);
@@ -401,4 +443,114 @@ Palette::Palette(int n_col, int n_sprite, SDL_Texture **sprites)
     sprites_ = sprites;
     selection1_ = 0;
     selection2_ = 0;
+}
+
+static void draw_button_border(bool depressed, SDL_Rect *rect)
+{
+    int x0 = rect->x;
+    int y0 = rect->y;
+    int x1 = rect->x + rect->w;
+    int y1 = rect->y + rect->h;
+
+    SDL_Point pt[3];
+    SDL_Rect r;
+
+    pt[0].x = x0;
+    pt[0].y = y1-2;
+    pt[1].x = x0;
+    pt[1].y = y0;
+    pt[2].x = x1-2;
+    pt[2].y = y0;
+
+    if (depressed) {
+        SDL_SetRenderDrawColor(renderer, BLACK);
+    } else {
+        SDL_SetRenderDrawColor(renderer, WHITE);
+    }
+    SDL_RenderDrawLines(renderer, pt, 3);
+
+    pt[0].x = x0+1;
+    pt[0].y = y1-3;
+    pt[1].x = x0+1;
+    pt[1].y = y0+1;
+    pt[2].x = x1-3;
+    pt[2].y = y0+1;
+
+    if (depressed) {
+        SDL_SetRenderDrawColor(renderer, DARK_GRAY);
+    } else {
+        SDL_SetRenderDrawColor(renderer, GRAY_224);
+    }
+    SDL_RenderDrawLines(renderer, pt, 3);
+
+    r.x = x0+2;
+    r.y = y0+2;
+    r.w = rect->w-4;
+    r.h = rect->h-4;
+
+    SDL_SetRenderDrawColor(renderer, LIGHT_GRAY);
+    SDL_RenderFillRect(renderer, &r);
+
+    pt[0].x = x0+1;
+    pt[0].y = y1-2;
+    pt[1].x = x1-2;
+    pt[1].y = y1-2;
+    pt[2].x = x1-2;
+    pt[2].y = y0+1;
+
+    if (depressed) {
+        SDL_SetRenderDrawColor(renderer, GRAY_224);
+    } else {
+        SDL_SetRenderDrawColor(renderer, DARK_GRAY);
+    }
+    SDL_RenderDrawLines(renderer, pt, 3);
+
+    pt[0].x = x1-1;
+    pt[0].y = y0;
+    pt[1].x = x1-1;
+    pt[1].y = y1-1;
+    pt[2].x = x0;
+    pt[2].y = y1-1;
+
+    if (depressed) {
+        SDL_SetRenderDrawColor(renderer, WHITE);
+    } else {
+        SDL_SetRenderDrawColor(renderer, BLACK);
+    }
+    SDL_RenderDrawLines(renderer, pt, 3);
+}
+
+static Widget *widget_at(int x, int y)
+{
+    Container *c = root;
+loop:
+    for (int i=c->n_child_-1; i>=0; i--) {
+        Widget *cw = c->children_[i];
+        int dx = x - cw->x_;
+        if (dx < 0 || dx >= cw->w_) continue;
+        int dy = y - cw->y_;
+        if (dy < 0 || dy >= cw->h_) continue;
+        Container *cc = dynamic_cast<Container*>(cw);
+        if (cc) {
+            c = cc;
+            goto loop;
+        } else {
+            return cw;
+        }
+    }
+    return c;
+}
+
+static void capture_mouse(Widget *w)
+{
+    //printf("capture mouse: %p\n", w);
+    widget_capturing_mouse = w;
+    SDL_CaptureMouse(SDL_TRUE);
+}
+
+static void release_mouse()
+{
+    //puts("release mouse");
+    widget_capturing_mouse = nullptr;
+    SDL_CaptureMouse(SDL_FALSE);
 }

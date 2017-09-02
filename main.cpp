@@ -446,7 +446,11 @@ l:
         case SDL_MOUSEBUTTONDOWN:
             handle_button_down(&e.button);
             break;
+        case SDL_MOUSEBUTTONUP:
+            handle_button_up(&e.button);
+            break;
         case SDL_MOUSEMOTION:
+            handle_mouse_motion(&e.motion);
             if (e.motion.state & (SDL_BUTTON_LMASK|SDL_BUTTON_RMASK)) {
                 int dx = e.motion.x - BOARD_X;
                 int dy = e.motion.y - BOARD_Y;
@@ -632,7 +636,7 @@ int main(int argc, char **argv)
     int w = WINDOW_W;
     int h = WINDOW_H;
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
         fprintf(stderr, "Unable to initialize SDL: %s\n",
                 SDL_GetError());
         return 1;
