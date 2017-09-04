@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
+#include <cassert>
 
 #include "gui.h"
 
@@ -115,10 +116,12 @@ Container::Container(int cap)
 {
     children_ = new Widget*[cap];
     n_child_ = 0;
+    cap_ = cap;
 }
 
 void Container::add_child(Widget *cw, int x, int y)
 {
+    assert(n_child_ < cap_);
     cw->x_ = x_ + x;
     cw->y_ = y_ + y;
     children_[n_child_++] = cw;

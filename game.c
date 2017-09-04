@@ -276,10 +276,11 @@ void tick(void)
 			int y = tank_y;
 			int x = tank_x;
 			struct laser *l = add_laser(y, x, 2, tank_orient);
-			// this loop implements instantaneous firing
+			// if instantaneous firing is not desired, comment out
+			// this loop
 			while (l->dir >= 0) {
 				update_laser(l);
-				if (!board[l->y][l->x].fg) {
+				if (l->dir >= 0 || !board[l->y][l->x].fg) {
 					struct laser *vl =
 						&visual_lasers[num_visual_lasers++];
 					vl->y = l->y;

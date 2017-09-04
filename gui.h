@@ -21,6 +21,7 @@ class Container: public Widget {
 public:
     int n_child_;
     Widget **children_;
+    int cap_;
     void add_child(Widget *child, int x, int y);
     Container(int cap);
     void paint() override;
