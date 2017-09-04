@@ -64,7 +64,7 @@ Canvas *board_canvas;
 Panel *game_panel;
 Panel *control_panel;
 Palette *editor_palette;
-TextWidget *level_name_text, *level_author_text;
+TextWidget *level_number_text, *level_name_text, *level_author_text;
 
 bool editor_on;
 
@@ -150,6 +150,9 @@ void start_level(void)
     if (editor_on) {
         close_editor();
     }
+    char tmp[12];
+    sprintf(tmp, "%d", current_level+1);
+    level_number_text->set_text(tmp);
     level_name_text->set_text(l->name);
     level_author_text->set_text(l->author);
 }
@@ -576,14 +579,19 @@ void populate_gui(void)
     board_canvas->paint_ = (paint_handler) draw_board;
     root->add_child(board_canvas, BOARD_X, BOARD_Y);
 
+    level_number_text = new TextWidget();
+    level_number_text->set_size(99, 21);
+    level_number_text->set_text_color(255, 255, 255, 255);
+    root->add_child(level_number_text, 592, 41);
+
     level_name_text = new TextWidget();
-    level_name_text->set_size(164, 22);
+    level_name_text->set_size(163, 21);
     level_name_text->set_text_color(255, 255, 255, 255);
     root->add_child(level_name_text, 559, 99);
 
     level_author_text = new TextWidget();
-    level_author_text->set_size(164, 22);
-    level_name_text->set_text_color(255, 255, 255, 255);
+    level_author_text->set_size(163, 21);
+    level_author_text->set_text_color(255, 255, 255, 255);
     root->add_child(level_author_text, 559, 148);
 
     // control panel absolute coordinates (bevel included): 560 250 715 405
@@ -679,7 +687,7 @@ int main(int argc, char **argv)
     font = TTF_OpenFont("data/arial.ttf", 13);
     if (font == NULL) return 1;
 
-    init_gui(1);
+    init_gui(6);
     populate_gui();
 
     game_timer = SDL_AddTimer(MS_PER_TICK, timer_callback, NULL);

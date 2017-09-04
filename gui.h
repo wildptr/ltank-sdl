@@ -14,6 +14,7 @@ public:
     virtual void paint() {}
     void set_size(int w, int h);
     Widget(): x_(0), y_(0), w_(0), h_(0) {}
+    virtual ~Widget() {}
 };
 
 class Container: public Widget {
@@ -53,7 +54,6 @@ public:
 };
 
 class TextArea {
-    const char *text_;
     SDL_Texture *tex_;
     int tex_w_, tex_h_;
 public:

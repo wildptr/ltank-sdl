@@ -52,7 +52,6 @@ void TextArea::paint(int x, int y, int w, int h)
 
 TextArea::TextArea()
 {
-    text_ = nullptr;
     color_.r = 0;
     color_.g = 0;
     color_.b = 0;
@@ -65,9 +64,8 @@ void TextArea::set_text(const char *text)
 {
     if (tex_)
         SDL_DestroyTexture(tex_);
-    text_ = text;
     if (text) {
-        SDL_Surface *s = TTF_RenderText_Blended(font, text_, color_);
+        SDL_Surface *s = TTF_RenderText_Blended(font, text, color_);
         tex_ = SDL_CreateTextureFromSurface(renderer, s);
         tex_w_ = s->w;
         tex_h_ = s->h;
