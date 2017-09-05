@@ -208,6 +208,58 @@ void fix_laser(struct laser *l)
 			l->dir = -1;
 		}
 		break;
+	case F_ROT_MIRROR_NE:
+		switch (l->dir) {
+		case SOUTH:
+		case WEST:
+			l->dir = (3-l->dir)&3;
+			l->style = (l->style & 0xf0) | 2;
+			break;
+		default:
+			record_rotate_mirror(y, x);
+			board[y][x].fg = F_ROT_MIRROR_SE;
+			l->dir = -1;
+		}
+		break;
+	case F_ROT_MIRROR_SE:
+		switch (l->dir) {
+		case WEST:
+		case NORTH:
+			l->dir = (1-l->dir)&3;
+			l->style = (l->style & 0xf0) | 3;
+			break;
+		default:
+			record_rotate_mirror(y, x);
+			board[y][x].fg = F_ROT_MIRROR_SW;
+			l->dir = -1;
+		}
+		break;
+	case F_ROT_MIRROR_SW:
+		switch (l->dir) {
+		case NORTH:
+		case EAST:
+			l->dir = (3-l->dir)&3;
+			l->style = (l->style & 0xf0) | 4;
+			break;
+		default:
+			record_rotate_mirror(y, x);
+			board[y][x].fg = F_ROT_MIRROR_NW;
+			l->dir = -1;
+		}
+		break;
+	case F_ROT_MIRROR_NW:
+		switch (l->dir) {
+		case EAST:
+		case SOUTH:
+			l->dir = (1-l->dir)&3;
+			l->style = (l->style & 0xf0) | 5;
+			break;
+		default:
+			record_rotate_mirror(y, x);
+			board[y][x].fg = F_ROT_MIRROR_NE;
+			l->dir = -1;
+		}
+		break;
 	}
 }
 

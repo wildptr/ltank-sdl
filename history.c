@@ -21,6 +21,7 @@ enum {
 	BREAK_BRICK,
 	BREAK_ANTI,
 	SINK,
+	ROTATE_MIRROR,
 	DIE,
 };
 
@@ -73,6 +74,12 @@ void record_sink(int y, int x, uint8_t obj)
 	record(obj);
 	record(pack(y, x));
 	record(SINK);
+}
+
+void record_rotate_mirror(int y, int x)
+{
+	record(pack(y, x));
+	record(ROTATE_MIRROR);
 }
 
 void record_die(void)
@@ -138,6 +145,9 @@ void undo(void)
 			d = code - MOVE_OBJ_N;
 			board[y][x].fg = board[y+Dy[d]][x+Dx[d]].fg;
 			board[y+Dy[d]][x+Dx[d]].fg = 0;
+			break;
+		case ROTATE_MIRROR:
+			board[y][x].fg = F_ROT_MIRROR_NE | ((board[y][x].fg-1)&3);
 			break;
 		case DIE:
 			tank_alive = true;
