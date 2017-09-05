@@ -25,6 +25,7 @@
 
 extern "C" {
 #include "game.h"
+#include "history.h"
 #include "level.h"
 }
 
@@ -147,6 +148,7 @@ void start_level(void)
     tank_alive = true;
     num_lasers = 0;
     active = true;
+    clear_history();
     if (editor_on) {
         close_editor();
     }
@@ -436,6 +438,9 @@ l:
             case SDLK_r:
                 if (!editor_on) start_level();
                 break;
+            case SDLK_u:
+                if (!editor_on) undo();
+                break;
             case SDLK_F9:
                 if (editor_on) {
                     close_editor();
@@ -690,11 +695,12 @@ int main(int argc, char **argv)
     init_gui(6);
     populate_gui();
 
-    game_timer = SDL_AddTimer(MS_PER_TICK, timer_callback, NULL);
-
     anim_on = true;
     current_level = 0;
+    init_history();
     start_level();
+
+    game_timer = SDL_AddTimer(MS_PER_TICK, timer_callback, NULL);
 
     render();
 

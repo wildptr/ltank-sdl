@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "game.h"
+#include "history.h"
 
 #define MAX_LASERS 256
 
@@ -14,8 +15,8 @@ int num_lasers, num_visual_lasers;
 struct laser lasers[MAX_LASERS], visual_lasers[256];
 bool active;
 
-static int Dx[4] = {0,1,0,-1};
-static int Dy[4] = {-1,0,1,0};
+int Dx[4] = {0,1,0,-1};
+int Dy[4] = {-1,0,1,0};
 
 struct laser *add_laser(int y, int x, int color, int dir)
 {
@@ -92,9 +93,11 @@ bool check_antitank(int dir, struct point *p)
 	return false;
 }
 
-void fix_tile(struct tile *t)
+void fix_tile(int y, int x)
 {
+	struct tile *t = &board[y][x];
 	if (t->bg == B_WATER) {
+		record_sink(y, x, t->fg);
 		if (t->fg == F_CRATE) t->bg = B_BRIDGE;
 		t->fg = 0;
 	}
@@ -106,9 +109,10 @@ void try_nudge_object(int y, int x, int dir)
 	int xx = x + Dx[dir];
 
 	if ((yy|xx)>>4 == 0 && board[yy][xx].fg == 0) {
+		record_move_object(y, x, dir);
 		board[yy][xx].fg = board[y][x].fg;
 		board[y][x].fg = 0;
-		fix_tile(&board[yy][xx]);
+		fix_tile(yy, xx);
 	}
 }
 
@@ -119,6 +123,7 @@ void fix_laser(struct laser *l)
 
 	if (tank_alive) {
 		if (y == tank_y && x == tank_x) {
+			record_die();
 			tank_alive = false;
 			l->dir = -1;
 			return;
@@ -139,6 +144,7 @@ void fix_laser(struct laser *l)
 		l->dir = -1;
 		break;
 	case F_BRICK:
+		record_break_brick(y, x);
 		board[y][x].fg = 0;
 		l->dir = -1;
 		break;
@@ -147,6 +153,7 @@ void fix_laser(struct laser *l)
 	case F_ANTI_S:
 	case F_ANTI_W:
 		if (obj - F_ANTI_N == ((l->dir+2)&3)) {
+			record_break_anti(y, x);
 			board[y][x].fg += 4;
 		} else {
 			try_nudge_object(y, x, l->dir);
@@ -275,6 +282,7 @@ void tick(void)
 		if (num_lasers < MAX_LASERS) {
 			int y = tank_y;
 			int x = tank_x;
+			record_move_tank(y, x, tank_orient);
 			struct laser *l = add_laser(y, x, 2, tank_orient);
 			// if instantaneous firing is not desired, comment out
 			// this loop
@@ -322,6 +330,7 @@ void tick(void)
 	case MOVE_LEFT:
 		dir = tank_action - MOVE_UP;
 		if (is_clear(tank_y, tank_x, dir)) {
+			record_move_tank(tank_y, tank_x, dir);
 			move_tank(dir);
 		}
 		break;
@@ -338,6 +347,7 @@ void tick(void)
 		active = false;
 		break;
 	case B_WATER:
+		record_die();
 		tank_alive = false;
 		break;
 	case B_BELT_N:
