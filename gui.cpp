@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <cassert>
+#include <string>
 
 #include "gui.h"
 
@@ -19,9 +20,8 @@ static Widget *widget_capturing_mouse;
 static void draw_inner_bevel(SDL_Rect *r);
 static void draw_outer_bevel(SDL_Rect *r);
 static void draw_button_border(bool depressed, SDL_Rect *r);
+static void draw_edit_border(SDL_Rect *r);
 static Widget *widget_at(int x, int y);
-static void capture_mouse(Widget *w);
-static void release_mouse();
 
 Container *root;
 
@@ -218,7 +218,7 @@ void Button::paint()
     caption_.paint(x_+d, y_+d, w_, h_);
 }
 
-Button::Button(button_down_handler cb):
+Button::Button(button_event_handler cb):
     depressed_(false),
     left_button_down_(false),
     click_(cb) {}
@@ -249,6 +249,16 @@ void Canvas::button_down(int button, int x, int y)
     button_down_(this, button, x, y);
 }
 
+void Canvas::button_up(int button, int x, int y)
+{
+    button_up_(this, button, x, y);
+}
+
+void Canvas::mouse_move(int x, int y)
+{
+    mouse_move_(this, x, y);
+}
+
 void Canvas::paint()
 {
     paint_(this);
@@ -271,6 +281,23 @@ void TextWidget::set_text(const char *s)
 void TextWidget::set_text_color(Uint8 r, Uint8 g, Uint8 b, Uint8 a)
 {
     text_area_.set_color(r, g, b, a);
+}
+
+/*
+ * Edit class
+ */
+
+void Edit::paint()
+{
+    SDL_Rect r = { x_, y_, w_, h_ };
+    draw_edit_border(&r);
+    r.x += 2;
+    r.y += 2;
+    r.w -= 4;
+    r.h -= 4;
+    SDL_SetRenderDrawColor(renderer, WHITE);
+    SDL_RenderFillRect(renderer, &r);
+    text_area_.paint(x_, y_, w_, h_);
 }
 
 /*
@@ -521,6 +548,65 @@ static void draw_button_border(bool depressed, SDL_Rect *rect)
     SDL_RenderDrawLines(renderer, pt, 3);
 }
 
+static void draw_edit_border(SDL_Rect *rect)
+{
+    int x0 = rect->x;
+    int y0 = rect->y;
+    int x1 = rect->x + rect->w;
+    int y1 = rect->y + rect->h;
+
+    SDL_Point pt[3];
+    SDL_Rect r;
+
+    pt[0].x = x0;
+    pt[0].y = y1-2;
+    pt[1].x = x0;
+    pt[1].y = y0;
+    pt[2].x = x1-2;
+    pt[2].y = y0;
+
+    SDL_SetRenderDrawColor(renderer, DARK_GRAY);
+    SDL_RenderDrawLines(renderer, pt, 3);
+
+    pt[0].x = x0+1;
+    pt[0].y = y1-3;
+    pt[1].x = x0+1;
+    pt[1].y = y0+1;
+    pt[2].x = x1-3;
+    pt[2].y = y0+1;
+
+    SDL_SetRenderDrawColor(renderer, BLACK);
+    SDL_RenderDrawLines(renderer, pt, 3);
+
+    r.x = x0+2;
+    r.y = y0+2;
+    r.w = rect->w-4;
+    r.h = rect->h-4;
+
+    SDL_SetRenderDrawColor(renderer, LIGHT_GRAY);
+    SDL_RenderFillRect(renderer, &r);
+
+    pt[0].x = x0+1;
+    pt[0].y = y1-2;
+    pt[1].x = x1-2;
+    pt[1].y = y1-2;
+    pt[2].x = x1-2;
+    pt[2].y = y0+1;
+
+    SDL_SetRenderDrawColor(renderer, GRAY_224);
+    SDL_RenderDrawLines(renderer, pt, 3);
+
+    pt[0].x = x1-1;
+    pt[0].y = y0;
+    pt[1].x = x1-1;
+    pt[1].y = y1-1;
+    pt[2].x = x0;
+    pt[2].y = y1-1;
+
+    SDL_SetRenderDrawColor(renderer, WHITE);
+    SDL_RenderDrawLines(renderer, pt, 3);
+}
+
 static Widget *widget_at(int x, int y)
 {
     Container *c = root;
@@ -542,14 +628,14 @@ loop:
     return c;
 }
 
-static void capture_mouse(Widget *w)
+void capture_mouse(Widget *w)
 {
     //printf("capture mouse: %p\n", w);
     widget_capturing_mouse = w;
     SDL_CaptureMouse(SDL_TRUE);
 }
 
-static void release_mouse()
+void release_mouse()
 {
     //puts("release mouse");
     widget_capturing_mouse = nullptr;

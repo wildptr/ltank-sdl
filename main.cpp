@@ -22,6 +22,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string>
 
 extern "C" {
 #include "game.h"
@@ -68,6 +69,9 @@ Palette *editor_palette;
 TextWidget *level_number_text, *level_name_text, *level_author_text;
 
 bool editor_on;
+
+bool editor_left_button_down;
+bool editor_right_button_down;
 
 SDL_TimerID game_timer;
 
@@ -459,22 +463,6 @@ l:
             break;
         case SDL_MOUSEMOTION:
             handle_mouse_motion(&e.motion);
-            if (e.motion.state & (SDL_BUTTON_LMASK|SDL_BUTTON_RMASK)) {
-                int dx = e.motion.x - BOARD_X;
-                int dy = e.motion.y - BOARD_Y;
-                if ((dx|dy)>>9 == 0) {
-                    int cy = dy >> 5;
-                    int cx = dx >> 5;
-                    int obj;
-                    if (e.motion.state & SDL_BUTTON_LMASK) {
-                        obj = editor_palette->selection1_;
-                    } else {
-                        obj = editor_palette->selection2_;
-                    }
-                    editor_place_object(obj, cy, cx);
-                    render();
-                }
-            }
             break;
         case SDL_QUIT:
             return;
@@ -514,7 +502,7 @@ void cb_next_level_button(Widget *, int, int, int)
     }
 }
 
-void board_canvas_button_down(struct canvas *w, int button, int x, int y)
+void board_canvas_button_down(Widget *w, int button, int x, int y)
 {
     switch (button) {
     case SDL_BUTTON_LEFT:
@@ -525,14 +513,49 @@ void board_canvas_button_down(struct canvas *w, int button, int x, int y)
             int obj;
             if (button == SDL_BUTTON_LEFT) {
                 obj = editor_palette->selection1_;
+                editor_left_button_down = true;
+            } else {
+                obj = editor_palette->selection2_;
+                editor_right_button_down = true;
+            }
+            editor_place_object(obj, cy, cx);
+            render();
+            capture_mouse(w);
+        } else {
+        }
+        break;
+    }
+}
+
+void board_canvas_button_up(Widget *, int button, int x, int y)
+{
+    switch (button) {
+    case SDL_BUTTON_LEFT:
+        editor_left_button_down = false;
+        break;
+    case SDL_BUTTON_RIGHT:
+        editor_right_button_down = false;
+        break;
+    }
+    if (!editor_left_button_down && !editor_right_button_down)
+        release_mouse();
+}
+
+void board_canvas_mouse_move(Widget *, int x, int y)
+{
+    if (editor_left_button_down || editor_right_button_down) {
+        if (!((x|y)&-512)) {
+            int cy = y >> 5;
+            int cx = x >> 5;
+            int obj;
+            if (editor_left_button_down) {
+                obj = editor_palette->selection1_;
             } else {
                 obj = editor_palette->selection2_;
             }
             editor_place_object(obj, cy, cx);
             render();
-        } else {
         }
-        break;
     }
 }
 
@@ -545,12 +568,12 @@ void populate_gui(void)
         { 5, 55, 145, 20 },
         { 5, 80, 70, 20 },
         { 80, 80, 70, 20 },
-        { 5, 105, 145, 20 },
+        { 80, 105, 70, 20 },
         { 5, 130, 70, 20 },
         { 80, 130, 70, 20 },
     };
 
-    static button_down_handler button_cb[NUM_BUTTONS] = {
+    static button_event_handler button_cb[NUM_BUTTONS] = {
         null_proc,
         null_proc,
         null_proc,
@@ -580,7 +603,9 @@ void populate_gui(void)
 
     board_canvas = new Canvas();
     board_canvas->set_size(512, 512);
-    board_canvas->button_down_ = (button_down_handler) board_canvas_button_down;
+    board_canvas->button_down_ = board_canvas_button_down;
+    board_canvas->button_up_ = board_canvas_button_up;
+    board_canvas->mouse_move_ = board_canvas_mouse_move;
     board_canvas->paint_ = (paint_handler) draw_board;
     root->add_child(board_canvas, BOARD_X, BOARD_Y);
 
@@ -605,15 +630,18 @@ void populate_gui(void)
     game_panel->set_size(181, 299);
     root->add_child(game_panel, 550, 245);
 
-    control_panel = new Panel(NUM_BUTTONS, Panel::BEVEL_INNER);
+    control_panel = new Panel(NUM_BUTTONS+1, Panel::BEVEL_INNER);
     control_panel->set_size(155, 155);
     game_panel->add_child(control_panel, 10, 5);
 
     for (int i=0; i<NUM_BUTTONS; i++) {
-        Button *b = new Button(button_down_handler(button_cb[i]));
+        Button *b = new Button(button_event_handler(button_cb[i]));
         button[i] = b;
         b->set_size(button_rect[i].w, button_rect[i].h);
         switch (i) {
+        case 6:
+            b->set_text("Go");
+            break;
         case 7:
             b->set_text("<< Level");
             break;
@@ -623,6 +651,10 @@ void populate_gui(void)
         }
         control_panel->add_child(b, button_rect[i].x, button_rect[i].y);
     }
+
+    Edit *edit = new Edit();
+    edit->set_size(70, 20);
+    control_panel->add_child(edit, 5, 105);
 
     for (int i=0; i<NUM_PALETTE_SPRITES; i++) {
         palette_sprites[i] = sprites[palette_sprite_id[i]];
