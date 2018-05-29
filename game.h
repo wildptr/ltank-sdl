@@ -73,6 +73,7 @@ extern struct tile board[16][16];
 extern int tank_y, tank_x;
 extern int tank_orient;
 extern int tank_action;
+extern int tank_sliding_dir;
 extern bool tank_alive;
 extern int num_lasers, num_visual_lasers;
 extern struct laser lasers[], visual_lasers[];

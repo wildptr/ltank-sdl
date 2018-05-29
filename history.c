@@ -20,6 +20,7 @@ enum {
 	MOVE_OBJ_W,
 	BREAK_BRICK,
 	BREAK_ANTI,
+	BREAK_ICE,
 	SINK,
 	ROTATE_MIRROR,
 	DIE,
@@ -67,6 +68,12 @@ void record_break_anti(int y, int x)
 {
 	record(pack(y, x));
 	record(BREAK_ANTI);
+}
+
+void record_break_ice(int y, int x)
+{
+	record(pack(y, x));
+	record(BREAK_ICE);
 }
 
 void record_sink(int y, int x, uint8_t obj)
@@ -127,12 +134,16 @@ void undo(void)
 			// this is necessary to prevent problems with tank
 			// movers
 			tank_action = 0;
+			tank_sliding_dir = -1;
 			break;
 		case BREAK_BRICK:
 			board[y][x].fg = F_BRICK;
 			break;
 		case BREAK_ANTI:
 			board[y][x].fg -= 4;
+			break;
+		case BREAK_ICE:
+			board[y][x].bg = B_THIN_ICE;
 			break;
 		case SINK:
 			board[y][x].fg = history[--q];

@@ -10,6 +10,7 @@ struct tile board[16][16];
 int tank_y, tank_x;
 int tank_orient;
 int tank_action;
+int tank_sliding_dir;
 bool tank_alive;
 int num_lasers, num_visual_lasers;
 struct laser lasers[MAX_LASERS], visual_lasers[256];
@@ -273,18 +274,24 @@ bool is_clear(int y, int x, int dir)
 int tank_mover_direction(void)
 {
 	uint8_t bg = board[tank_y][tank_x].bg;
+	int dir;
 
 	switch (bg) {
-		int dir;
 	case B_BELT_N:
 	case B_BELT_E:
 	case B_BELT_S:
 	case B_BELT_W:
 		dir = bg - B_BELT_N;
-		return is_clear(tank_y, tank_x, dir) ? dir : -1;
+		break;
+	case B_ICE:
+	case B_THIN_ICE:
+		dir = tank_sliding_dir;
+		break;
+	default:
+		dir = -1;
 	}
 
-	return -1;
+	return dir >= 0 && is_clear(tank_y, tank_x, dir) ? dir : -1;
 }
 
 void move_tank(int dir)
@@ -322,10 +329,12 @@ void update_laser(struct laser *l)
 
 void tick(void)
 {
+#if 0
 	if (tank_action == 0 && num_lasers == 0) {
 		int d = tank_mover_direction();
 		if (d < 0) return;
 	}
+#endif
 
 	/*
 	 * Let the tank fire laser.
@@ -359,13 +368,27 @@ void tick(void)
 		update_laser(&lasers[i]);
 	}
 
+	/* 'd' is the direction in which the tank moves.  -1 means tank does
+	   not move.  This must be done before breaking thin ice. */
+	int d = tank_mover_direction();
+
+	/*
+	 * Break thin ice.
+	 */
+	uint8_t bg = board[tank_y][tank_x].bg;
+	if (bg == B_THIN_ICE) {
+		record_break_ice(tank_y, tank_x);
+		board[tank_y][tank_x].bg = B_WATER;
+	}
+
 	/*
 	 * Update tank position.
 	 */
-	int d = tank_mover_direction();
 	if (d >= 0) {
 		move_tank(d);
 		tank_action = 0;
+	} else {
+		tank_sliding_dir = -1;
 	}
 
 	switch (tank_action) {
@@ -380,10 +403,12 @@ void tick(void)
 	case MOVE_RIGHT:
 	case MOVE_DOWN:
 	case MOVE_LEFT:
+		/* d == -1 */
 		dir = tank_action - MOVE_UP;
 		if (is_clear(tank_y, tank_x, dir)) {
 			record_move_tank(tank_y, tank_x, dir);
 			move_tank(dir);
+			d = dir;
 		}
 		break;
 	}
@@ -392,9 +417,8 @@ void tick(void)
 	/*
 	 * Update flags according to the object the tank is sitting on.
 	 */
-	uint8_t bg = board[tank_y][tank_x].bg;
+	bg = board[tank_y][tank_x].bg;
 	switch (bg) {
-		int dir;
 	case B_FLAG:
 		active = false;
 		break;
@@ -402,14 +426,9 @@ void tick(void)
 		record_die();
 		tank_alive = false;
 		break;
-	case B_BELT_N:
-	case B_BELT_E:
-	case B_BELT_S:
-	case B_BELT_W:
-		dir = bg - B_BELT_N;
-		if (is_clear(tank_y, tank_x, dir)) {
-			tank_action = MOVE_UP + dir;
-		}
+	case B_ICE:
+	case B_THIN_ICE:
+		tank_sliding_dir = d;
 		break;
 	}
 
