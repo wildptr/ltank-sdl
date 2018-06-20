@@ -1,4 +1,7 @@
-# ltank-sdl Jim Kindley's Laser Tank game remade with SDL 2.0
+# ltank-sdl
+
+This is a SDL 2.0 remake of Jim Kindley's Laser Tank game. It runs on all major
+desktop operating systems.
 
 ## Differences from original game
 
@@ -36,8 +39,8 @@ There might be other subtle differences. Also see missing features below.
 * Press `u` to undo last move
 * Press `r` to restart game
 * Press `F9` to toggle editor mode
-* Press 'a' to toggle animation
+* Press `a` to toggle animation
 
 ## Screenshot
 
-![Level1: Boot Camp](doc/screenshot1.png?raw=true "Level 1: Boot Camp")
+![Level1: Boot Camp](doc/screenshot1.png)
